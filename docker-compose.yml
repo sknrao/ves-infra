@@ -1,0 +1,138 @@
+services:
+
+  zookeeper:
+    image: nexus3.onap.org:10001/onap/dmaap/zookeeper:6.0.3
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_REPLICAS: 1
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SYNC_LIMIT: 5
+      ZOOKEEPER_INIT_LIMIT: 10
+      ZOOKEEPER_MAX_CLIENT_CNXNS: 200
+      ZOOKEEPER_AUTOPURGE_SNAP_RETAIN_COUNT: 3
+      ZOOKEEPER_AUTOPURGE_PURGE_INTERVAL: 24
+      ZOOKEEPER_CLIENT_PORT: 2181
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/zookeeper/secrets/jaas/zk_server_jaas.conf -Dzookeeper.kerberos.removeHostFromPrincipal=true -Dzookeeper.kerberos.removeRealmFromPrincipal=true -Dzookeeper.authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider -Dzookeeper.requireClientAuthScheme=sasl
+      ZOOKEEPER_SERVER_ID:
+    ports:
+      - "2181:2181"
+      - "2888:2888"
+    volumes:
+      - ./zookeeper/zk_server_jaas.conf:/etc/zookeeper/secrets/jaas/zk_server_jaas.conf
+    networks:
+      smo:
+
+  kafka:
+    image: nexus3.onap.org:10001/onap/dmaap/kafka111:1.0.4
+    container_name: kafka
+    environment:
+      enableCadi: 'false'
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ZOOKEEPER_CONNECTION_TIMEOUT_MS: 40000
+      KAFKA_ZOOKEEPER_SESSION_TIMEOUT_MS: 40000
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL_PLAINTEXT:PLAINTEXT,EXTERNAL_PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL_PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: INTERNAL_PLAINTEXT://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL_PLAINTEXT
+      KAFKA_CONFLUENT_SUPPORT_METRICS_ENABLE: 'false'
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/jaas/zk_client_jaas.conf
+      KAFKA_ZOOKEEPER_SET_ACL: 'true'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      # Reduced the number of partitions only to avoid the timeout error for the first subscribe call in slow environment
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 1
+    volumes:
+      - ./kafka/zk_client_jaas.conf:/etc/kafka/secrets/jaas/zk_client_jaas.conf
+    ports:
+      - "9092:9092"
+      - "9093-9093"
+    depends_on:
+      zookeeper:
+        condition: service_started
+    networks:
+      smo:
+
+  kafka-bridge:
+    image: quay.io/strimzi/kafka-bridge:0.25.0
+    container_name: kafka-bridge
+    hostname: kafka-bridge
+    entrypoint: /opt/strimzi/bin/kafka_bridge_run.sh
+    command: --config-file=config/application.properties
+    healthcheck:
+      test: curl http://localhost:8080/healthy || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./kafka-bridge:/opt/strimzi/config
+    depends_on:
+      kafka:
+        condition: service_started
+    ports:
+      - 9080:8080
+    networks:
+      smo:
+
+  messages:
+    image: nexus3.onap.org:10001/onap/dmaap/dmaap-mr:1.1.18
+    container_name: messages
+    hostname: messages
+    environment:
+      enableCadi: 'false'
+    volumes:
+      - ./messages/MsgRtrApi.properties:/appl/dmaapMR1/bundleconfig/etc/appprops/MsgRtrApi.properties
+      - ./messages/logback.xml:/appl/dmaapMR1/bundleconfig/etc/logback.xml
+      - ./messages/cadi.properties:/appl/dmaapMR1/etc/cadi.properties
+    depends_on:
+      kafka:
+        condition: service_started
+    networks:
+      smo:
+  
+  ves-collector:
+    image: nexus3.onap.org:10001/onap/org.onap.dcaegen2.collectors.ves.vescollector:1.10.1-configured
+    build:
+      context: ./ves-collector
+      args:
+        - BASEIMAGE=nexus3.onap.org:10001/onap/org.onap.dcaegen2.collectors.ves.vescollector:1.10.1
+    container_name: ves-collector
+    hostname: ves-collector
+    healthcheck:
+      test: curl -k -u sample1:sample1 http://localhost:8080 || exit 1
+      start_period: 1s
+      interval: 5s
+      timeout: 4s
+      retries: 5
+    environment:
+      DMAAPHOST: messages
+    volumes:
+      - ./ves-collector/collector.properties:/opt/app/VESCollector/etc/collector.properties
+      - ./ves-collector/ves-dmaap-config.json:/opt/app/VESCollector/etc/ves-dmaap-config.json
+    networks:
+      smo:
+      dcn:
+  
+  kafdrop:
+    container_name: kafdrop
+    image: obsidiandynamics/kafdrop:3.27.0
+    networks:
+      smo:
+    depends_on:
+      - kafka
+    ports:
+      - "9000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: "kafka:9092"
+
+networks:
+  smo:
+    name: smo
+    driver: bridge
+    enable_ipv6: false
+  dcn:
+    driver: bridge
+    name: dcn
+    enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+      - subnet: 2001:db8:1:50::/96 
