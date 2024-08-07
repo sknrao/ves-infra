@@ -68,7 +68,7 @@ services:
       kafka:
         condition: service_started
     ports:
-      - 9080:8080
+      - 3904:3904
     networks:
       smo:
 
@@ -78,6 +78,8 @@ services:
     hostname: messages
     environment:
       enableCadi: 'false'
+    ports:
+      - 13904:3904
     volumes:
       - ./messages/MsgRtrApi.properties:/appl/dmaapMR1/bundleconfig/etc/appprops/MsgRtrApi.properties
       - ./messages/logback.xml:/appl/dmaapMR1/bundleconfig/etc/logback.xml
@@ -96,6 +98,9 @@ services:
         - BASEIMAGE=nexus3.onap.org:10001/onap/org.onap.dcaegen2.collectors.ves.vescollector:1.10.1
     container_name: ves-collector
     hostname: ves-collector
+    ports:
+      - "8443:8443"
+      - "28080:8080"
     healthcheck:
       test: curl -k -u sample1:sample1 http://localhost:8080 || exit 1
       start_period: 1s
@@ -103,7 +108,7 @@ services:
       timeout: 4s
       retries: 5
     environment:
-      DMAAPHOST: messages
+      DMAAPHOST: kafka-bridge
     volumes:
       - ./ves-collector/collector.properties:/opt/app/VESCollector/etc/collector.properties
       - ./ves-collector/ves-dmaap-config.json:/opt/app/VESCollector/etc/ves-dmaap-config.json

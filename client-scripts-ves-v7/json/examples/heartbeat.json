@@ -1,0 +1,30 @@
+{
+  "event": {
+    "commonEventHeader": {
+      "domain": "heartbeat",
+      "eventId": "maya_2024-08-05T16:04:22.500879+00:00Z",
+      "eventName": "heartbeat_O_RAN_COMPONENT",
+      "eventType": "O_RAN_COMPONENT",
+      "lastEpochMicrosec": 1722873862500879,
+      "nfNamingCode": "SDN-Controller",
+      "nfVendorName": "O-RAN-SC OAM",
+      "priority": "Low",
+      "reportingEntityId": "",
+      "reportingEntityName": "maya",
+      "sequence": 357,
+      "sourceId": "",
+      "sourceName": "maya",
+      "startEpochMicrosec": 1722873862500879,
+      "timeZoneOffset": "+00:00",
+      "version": "4.1",
+      "vesEventListenerVersion": "7.2.1"
+    },
+    "heartbeatFields": {
+      "additionalFields": {
+        "eventTime": "2024-08-05T16:04:22.500879+00:00Z"
+      },
+      "heartbeatFieldsVersion": "3.0",
+      "heartbeatInterval": 20
+    }
+  }
+}
